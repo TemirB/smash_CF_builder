@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+        "fstream": "cpp",
+        "unordered_map": "cpp",
+        "string": "cpp",
+        "array": "cpp"
+    }
+}
