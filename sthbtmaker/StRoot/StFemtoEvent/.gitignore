@@ -1,0 +1,5 @@
+*.so
+*.o
+*.root
+StFemtoDst_Dict.C
+StFemtoDst_Dict_rdict.pcm

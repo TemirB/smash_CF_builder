@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Task description -->
+<job maxFilesPerProcess="5" filesPerHour="1" fileListSyntax="xrootd">
+
+  <!-- Decription of the task -->
+  <command>
+    stardev
+    setenv NODEBUG yes
+    <!-- set currentDir = ${SUBMITTINGDIRECTORY} -->
+    set softDir = /star/u/gnigmat/soft/stable
+    ln -s /star/u/gnigmat/soft/stable/StRoot/StFemtoEvent/libStFemtoDst.so .
+    ln -s ${softDir}/StRoot/StFemtoEvent/macros/FemtoDstAnalyzer.C .
+    ln -s ${softDir}/StRoot/StFemtoEvent/macros/RunAnalyzer.C .
+
+    root -b -l RunAnalyzer.C\(\"$FILELIST\",\"qa_$JOBID.root\"\)
+  </command>
+
+  <SandBox>
+    <Package>
+      <File>file:./RunAnalyzer.C</File>
+      <File>file:./FemtoDstAnalyzer.C</File>
+    </Package>
+  </SandBox>
+
+  <!-- Get input files from get_file_lis.pl -->
+  <input URL="file:/gpfs01/star/scratch/gnigmat/femtoDst/dau200/data/st_physics_17140021_raw_sum_3.femtoDst.root" />
+
+  <stdout URL="file:/star/data01/pwg/gnigmat/prodLogs/misc/$JOBID.out" />
+  <stderr URL="file:/star/data01/pwg/gnigmat/prodLogs/misc/$JOBID.err" />
+  <output fromScratch="*.root" toURL="file:/star/data01/pwg/gnigmat/dataFiles/qa/dau200/"/>
+  <output fromScratch="*.log"  toURL="file:/star/data01/pwg/gnigmat/prodLogs/misc/"/>
+
+  <Generator>
+    <Location>/star/data01/pwg/gnigmat/prodLogs/misc/</Location>
+  </Generator>
+
+</job>
