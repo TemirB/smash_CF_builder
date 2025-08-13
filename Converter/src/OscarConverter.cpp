@@ -30,7 +30,9 @@ bool OscarConverter::Convert(const std::string& inputFilename, const std::string
 
     for (unsigned int i = 0; i < McArrays::NAllMcArrays; i++) {
         arrays[i] = new TClonesArray(McArrays::mcArrayTypes[i], McArrays::mcArraySizes[i]);
-        tree->Branch(McArrays::mcArrayNames[i], &arrays[i], 65536, 99);
+        arrays[i]->SetOwner(kFALSE);
+        auto br = tree->Branch(McArrays::mcArrayNames[i], &arrays[i], 65536, 99);
+        if (br) br->SetAutoDelete(kFALSE);
     }
 
     std::ifstream infile(inputFilename);
@@ -58,13 +60,18 @@ bool OscarConverter::Convert(const std::string& inputFilename, const std::string
         std::istringstream iss(line);
 
         if (line[0] == '#') {
-            std::string dummy, keyWord;
-            iss >> dummy >> dummy >> ev_num >> keyWord >> n_part;
-
-            if (dummy == "interaction") {
+            std::string interaction, dummy, keyWord;
+            iss >> dummy >> interaction >> ev_num >> dummy >> dummy >> keyWord >> n_part;
+            //       #        event          1      ensemble    0        in         394
+            //       #        event          2      ensemble    0        out        399
+            //       #      interaction      in        2       out       2          rho    0.0000000    weight     42.07034                         partial    3.7040866 type     3
+            //       #        event          0      ensemble    0        end         0       impact      9.179       scattering_projectile_target        yes
+            if (interaction == "interaction") {
                 mode = Mode::Interaction;
+                // тут можно посмотреть считать 
+                // тип взаимодействия и его параметры
                 continue;
-            } else if (dummy == "event") {
+            } else if (interaction == "event") {
                 if (keyWord == "in") {
                     mode = Mode::InEvent;
                     isElastic = false;
@@ -81,6 +88,7 @@ bool OscarConverter::Convert(const std::string& inputFilename, const std::string
                 } else if (keyWord == "end") {
                     mode = Mode::EndEvent;
                     iss >> dummy >> timpactParameter;
+                    //    impact      9.179             scattering_projectile_target        yes
                     if (isElastic) {
                         timpactParameter = -1.;
                         continue;
@@ -121,11 +129,12 @@ bool OscarConverter::Convert(const std::string& inputFilename, const std::string
                 }
             }
 
+            int child[2] = {-1, -1};
             int idx = 0;
             for (const auto& entry : eventBuffer) {
                 const Particle& p1 = entry.second;
                 new((*(arrays[McArrays::Particle]))[arrays[McArrays::Particle]->GetEntries()])
-                McParticle(idx++, p1.pdg, 0, 0, 0, -1, 0, nullptr,
+                McParticle(idx++, p1.pdg, 0, 0, 0, -1, 0, child,
                           p1.px, p1.py, p1.pz, p1.p0,
                           p1.x, p1.y, p1.z, p1.t);
             }
@@ -138,7 +147,7 @@ bool OscarConverter::Convert(const std::string& inputFilename, const std::string
             event->setComment("");
             event->setStepNr(1);
             event->setStepT(200.);
-
+            
             tree->Fill();
             buffer.clear();
             endBuffer.clear();
@@ -151,10 +160,10 @@ bool OscarConverter::Convert(const std::string& inputFilename, const std::string
               0., 0., -1, 0, 0, 0., tree->GetEntries());
     run.Write();
 
+    std::cout << "Conversion completed. Total events: " << tree->GetEntries() << std::endl;
+
     outputFile->Write();
     outputFile->Close();
-
-    std::cout << "Conversion completed. Total events: " << tree->GetEntries() << std::endl;
 
     return true;
 }
