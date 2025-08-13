@@ -1,26 +1,25 @@
-# Compiler and flags
-CXX := g++
-CXXFLAGS := -O2 -std=c++17 -Wall -fPIC \
-    `root-config --cflags` \
-    -I. -IStHbtMaker -IMcDst -IStHbtMakerUser
+# Название выходного бинарного файла
+TARGET = hbt_auau_simu
 
-LDFLAGS := `root-config --libs` -Llibs \
-  -lStHbtMaker -lMcDst -lStHbtMakerUser \
-  -lStPicoDst -lStFemtoDst
+# Файл исходника
+SRC = hbt_auau_simu.cxx
 
+# Компилятор и флаги
+CXX = g++
+CXXFLAGS = -O2 -Wall -std=c++17 \
+  -I. \
+  -I./StarClassLibrary
 
-CXXFLAGS += `root-config --cflags`
-LDFLAGS  += `root-config --libs` -lMcDst
+# Путь к ROOT
+ROOTCFLAGS    = $(shell root-config --cflags)
+ROOTLIBS      = $(shell root-config --libs)
 
+# Локальные библиотеки (путь указывается относительно текущего каталога)
+LDFLAGS = -Llibs -lStHbtMaker -lStHbtMakerUser -lMcDst -lStPicoDst -lStFemtoDst
 
-# Target macro
-TARGET := hbt_auau_simu
-SRC := $(TARGET).cxx
-
-all: $(TARGET)
-
+# Компоновка
 $(TARGET): $(SRC)
-	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
+	$(CXX) $(CXXFLAGS) $(ROOTCFLAGS) $(SRC) -o $(TARGET) $(ROOTLIBS) $(LDFLAGS)
 
 clean:
 	rm -f $(TARGET)

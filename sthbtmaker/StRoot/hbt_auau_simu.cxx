@@ -321,23 +321,17 @@ int main(int argc, char *argv[]) {
   bool useMonitors = false;
 
   switch (argc) {
-  case 4:
-    inFileList  = argv[1];
-    oFileName   = argv[2];
-    useMonitors = ( atoi(argv[3]) != 0 ) ? true : false;
-    break;
-  default:
-    std::cout << "Usage: ./hbt_auau_simu input.list outputFile.root useMonitors" << std::endl;
-    return -1;
+    case 4:
+      inFileList  = argv[1];
+      oFileName   = argv[2];
+      useMonitors = ( atoi(argv[3]) != 0 ) ? true : false;
+      break;
+    default:
+      std::cout << "Usage: ./hbt_auau_simu input.list outputFile.root useMonitors" << std::endl;
+      return -1;
   }
 
-
   std::cout << " Input file list: " << inFileList << std::endl;
-
-
-  //
-  // Monte Carlo input setup
-  //
 
   std::cout << "Initializing McDstReader..." << std::endl;
   McDstReader *mcDstReader = new McDstReader(inFileList);
@@ -348,199 +342,119 @@ int main(int argc, char *argv[]) {
   std::cout << "McDstReader initialized" << std::endl;
 
   if( !mcDstReader->chain() ) {
-    std::cout << "[ERROR] No chain has been found in McDst. Terminating."
-              << std::endl;
+    std::cout << "[ERROR] No chain has been found in McDst. Terminating." << std::endl;
     return -1;
   }
 
   Long64_t events2read = mcDstReader->chain()->GetEntries();
   std::cout << "Number of events in chain: " << events2read << std::endl;
-  //events2read = 10;
-  //
-  // StHbtMaker setup
-  //
 
-  // StHbtMaker
   std::cout << "Initializing StHbtMaker" << std::endl;
   StHbtMaker* hbtMaker = new StHbtMaker("HBT","title");
-
-  // Create manager
   StHbtManager* hbtManager = hbtMaker->hbtManager();
 
-  // Setup StHbtReader
   StHbtMcDstReader *mcHbtReader = new StHbtMcDstReader(mcDstReader);
   mcHbtReader->setRotateEventPlane(false);
-  mcHbtReader->setMagneticField(-5.); // in kilogaus = -0.5 Tesla
-
-  // Add reader to the manager
+  mcHbtReader->setMagneticField(-5.);
   hbtManager->setEventReader(mcHbtReader);
 
+  // ---- Настройки
   const int ChargeBins = 2; // 0 - positive, 1 - negative
-  const int DetSelBins = 1;
+  const int MultBins = 4;   // центральности: 0...3
   const int kTBins = 4;
   const double kTRange[2] = { 0.15, 0.6 };
   const int qInvNbins = 40;
   const double qInvRange[2] = { 0., 0.4 };
   const int bpNbins = 80;
   const double bpRange[2] = { -0.4, 0.4 };
-
   const int mImpactBins = 1;
   const float mImpact[2] = { -100., 100. };
   const int mZBins = 1;
   const float mZ[2] = { -30., 30. };
   const int mEvents2Mix = 1;
+  const int mLocalDetSel = 4; // фиксировано!
 
-
-  // 0-TPC,
-  // 1-TOF,
-  // 2-TPC+TOF,
-  // 3-if(TOF){TPC+TOF} else{TPC},
-  // 4-if(TOF&&p>pthresh){TPC+TOF} else if (p<pthresh){TPC}
-  int mLocalDetSel = 4;
-  const int MultBins = 4;
-
-  StHbtModelVertexImpactAnalysis *hbtAnalysis[ChargeBins][DetSelBins][MultBins];
-  StHbtBasicEventCut *hbtEventCut[ChargeBins][DetSelBins][MultBins];
-  StHbtBasicTrackCut *hbtTrackCut[ChargeBins][DetSelBins][MultBins];
-  StHbtBasicPairCut *hbtPairCut[ChargeBins][DetSelBins][MultBins];
-  fxtEventCutMonitor *eventPass[ChargeBins][DetSelBins][MultBins];
-  fxtEventCutMonitor *eventFail[ChargeBins][DetSelBins][MultBins];
-  fxtTrackCutMonitor *trackPass[ChargeBins][DetSelBins][MultBins];
-  fxtTrackCutMonitor *trackFail[ChargeBins][DetSelBins][MultBins];
-  fxtPairCutMonitor *pairPass[ChargeBins][DetSelBins][MultBins];
-  fxtPairCutMonitor *pairFail[ChargeBins][DetSelBins][MultBins];
-  
+  // ---- Оставляем только необходимые массивы
+  StHbtModelVertexImpactAnalysis *hbtAnalysis[ChargeBins][MultBins];
+  StHbtBasicEventCut *hbtEventCut[ChargeBins][MultBins];
+  StHbtBasicTrackCut *hbtTrackCut[ChargeBins][MultBins];
+  StHbtBasicPairCut *hbtPairCut[ChargeBins][MultBins];
   StHbtModelWeightGeneratorLednicky *hbtWeight;
-  StHbtModelManager                 *thModelManager;
+  StHbtModelManager *thModelManager;
+  StHbtModelBPLCMS3DCorrFctnKt *bpCorrFctn[ChargeBins][MultBins];
+  StHbtModelQinvCorrFctnKt *qInvCorrFctn[ChargeBins][MultBins];
 
-  StHbtModelBPLCMS3DCorrFctnKt *bpCorrFctn[ChargeBins][DetSelBins][MultBins];
-  StHbtModelQinvCorrFctnKt *qInvCorrFctn[ChargeBins][DetSelBins][MultBins];
-  // Lednicky weight generator                                                                                                                                                                                                             
+  // -- Весовая модель и менеджер
   hbtWeight = new StHbtModelWeightGeneratorLednicky();
-  hbtWeight->setPairType( StHbtModelWeightGeneratorLednicky::PionPlusPionPlus() );
+  hbtWeight->setPairType(StHbtModelWeightGeneratorLednicky::PionPlusPionPlus());
   hbtWeight->setCoulOff();
   hbtWeight->setQuantumOn();
   hbtWeight->setStrongOff();
   hbtWeight->set3BodyOff();
 
-  // Theoretical model manager                                                                                                                                                                                                             
   thModelManager = new StHbtModelManager();
-  thModelManager->setWeightGenerator( hbtWeight );
-  thModelManager->createCopyHiddenInfo( true );
+  thModelManager->setWeightGenerator(hbtWeight);
+  thModelManager->createCopyHiddenInfo(true);
 
-  int mLocalCharge = 0;
+  // ---- Основной цикл по заряду и центральности
+  for (int iCharge = 0; iCharge < ChargeBins; ++iCharge) {
+    for (int iCent = 0; iCent < MultBins; ++iCent) {
+      int mLocalCharge = (iCharge == 0) ? 1 : -1;
 
-  // Loop over charges
-  for ( int iCharge = 0; iCharge < ChargeBins; iCharge++ ) {
-    // Loop over multiplicity bins
-    for ( int iDetSelBins = 0; iDetSelBins < DetSelBins; iDetSelBins++ ) {
-      for ( int iCent = 0; iCent < MultBins; iCent++ ) {
-        // Define local charge
-        mLocalCharge = ( iCharge == 0 ) ? 1 : -1;
-        // Define detector selection
-        if      ( iDetSelBins == 0 ) mLocalDetSel = 4;
-        else if ( iDetSelBins == 1 ) mLocalDetSel = 0;
-        else {
-          std::cout << "[WARNING] Wrong detector selection: " << iDetSelBins << std::endl;
-          mLocalDetSel = 0;
-        }
+      hbtAnalysis[iCharge][iCent] = new StHbtModelVertexImpactAnalysis(mZBins, mZ[0], mZ[1], mImpactBins, mImpact[0], mImpact[1]);
+      hbtAnalysis[iCharge][iCent]->setNumEventsToMix(mEvents2Mix);
+      hbtAnalysis[iCharge][iCent]->setVerboseMode(false);
 
-        // Create vertex mult analysis
-        hbtAnalysis[iCharge][iDetSelBins][iCent] = new StHbtModelVertexImpactAnalysis(mZBins, mZ[0], mZ[1],
-                                                                                      mImpactBins, mImpact[0], mImpact[1] );
-        hbtAnalysis[iCharge][iDetSelBins][iCent]->setNumEventsToMix( mEvents2Mix );
-	
-	      eventPass[iCharge][iDetSelBins][iCent] =
-          new fxtEventCutMonitor(Form("fxtEventCutMoni_%d_%d_%d_",iCharge, iDetSelBins, iCent), "pass");
-        eventFail[iCharge][iDetSelBins][iCent] =
-          new fxtEventCutMonitor(Form("fxtEventCutMoni_%d_%d_%d_",iCharge, iDetSelBins, iCent), "fail");
+      hbtEventCut[iCharge][iCent] = new StHbtBasicEventCut();
+      fillEventCut(hbtEventCut[iCharge][iCent], iCent, nullptr, nullptr);
 
-        trackPass[iCharge][iDetSelBins][iCent] =
-          new fxtTrackCutMonitor(Form("_pass_%d_%d_%d_",iCharge,iDetSelBins,iCent), M_PION_PLUS);
-        trackFail[iCharge][iDetSelBins][iCent] =
-          new fxtTrackCutMonitor(Form("_fail_%d_%d_%d_",iCharge,iDetSelBins,iCent), M_PION_PLUS);
-        pairPass[iCharge][iDetSelBins][iCent] = 
-          new fxtPairCutMonitor(Form("_pass_%d_%d_%d_", iCharge,iDetSelBins,iCent));
-              pairFail[iCharge][iDetSelBins][iCent] = 
-          new fxtPairCutMonitor(Form("_fail_%d_%d_%d_", iCharge,iDetSelBins,iCent));
+      hbtTrackCut[iCharge][iCent] = new StHbtBasicTrackCut();
+      fillTrackCut(hbtTrackCut[iCharge][iCent], mLocalCharge, StHbtBasicTrackCut::HbtPID::Pion, mLocalDetSel, nullptr, nullptr);
 
-        // Fill event cut and monitors
-        hbtEventCut[iCharge][iDetSelBins][iCent] = new StHbtBasicEventCut();
-        fillEventCut( hbtEventCut[iCharge][iDetSelBins][iCent], iCent,
-                      eventPass[iCharge][iDetSelBins][iCent],
-                      eventFail[iCharge][iDetSelBins][iCent] );
+      hbtPairCut[iCharge][iCent] = new StHbtBasicPairCut();
+      fillTrackPairCut(hbtPairCut[iCharge][iCent], nullptr, nullptr);
 
-        // Fill track cut and monitors
-        hbtTrackCut[iCharge][iDetSelBins][iCent] = new StHbtBasicTrackCut();
-        fillTrackCut(hbtTrackCut[iCharge][iDetSelBins][iCent],
-                     mLocalCharge, StHbtBasicTrackCut::HbtPID::Pion, mLocalDetSel,
-                     trackPass[iCharge][iDetSelBins][iCent],
-                     trackFail[iCharge][iDetSelBins][iCent]);
+      qInvCorrFctn[iCharge][iCent] = new StHbtModelQinvCorrFctnKt(
+        Form("qinv_%d_%d", iCharge, iCent),
+        qInvNbins, qInvRange[0], qInvRange[1], kTBins, kTRange[0], kTRange[1]);
+      qInvCorrFctn[iCharge][iCent]->connectToManager(thModelManager);
 
-        // Fill pair cut and monitors
-        hbtPairCut[iCharge][iDetSelBins][iCent] = new StHbtBasicPairCut();
-        fillTrackPairCut( hbtPairCut[iCharge][iDetSelBins][iCent],
-                            pairPass[iCharge][iDetSelBins][iCent],
-                            pairFail[iCharge][iDetSelBins][iCent] );
-        
-        qInvCorrFctn[iCharge][iDetSelBins][iCent] = new StHbtModelQinvCorrFctnKt( Form("qinv_%d_%d_%d",iCharge,iDetSelBins,iCent),
-        qInvNbins, qInvRange[0], qInvRange[1], kTBins, kTRange[0], kTRange[1] );
-        qInvCorrFctn[iCharge][iDetSelBins][iCent]->connectToManager(thModelManager);
-        bpCorrFctn[iCharge][iDetSelBins][iCent] = new StHbtModelBPLCMS3DCorrFctnKt(Form("bp_%d_%d_%d",iCharge,iDetSelBins,iCent),
-                                                                                    bpNbins, bpRange[0], bpRange[1],
-                                                                                    kTBins, kTRange[0], kTRange[1]);
-        bpCorrFctn[iCharge][iDetSelBins][iCent]->connectToManager(thModelManager);
-        // Fill like sign analysis
-        fillLikeSignAnalysis( hbtAnalysis[iCharge][iDetSelBins][iCent],
-                              hbtEventCut[iCharge][iDetSelBins][iCent],
-                              hbtTrackCut[iCharge][iDetSelBins][iCent],
-                              hbtPairCut[iCharge][iDetSelBins][iCent],
-                              qInvCorrFctn[iCharge][iDetSelBins][iCent],
-                              bpCorrFctn[iCharge][iDetSelBins][iCent]);
-        // Add analysis to manager
-        hbtManager->addAnalysis( hbtAnalysis[iCharge][iDetSelBins][iCent] );
-      } //iCent
-    } // for ( int iDetSelBins=0; iDetSelBins<MultBins; iDetSelBins++ )
-  } // for ( int iCharge=0; iCharge<ChargeBins; iCharge++ )
+      bpCorrFctn[iCharge][iCent] = new StHbtModelBPLCMS3DCorrFctnKt(
+        Form("bp_%d_%d", iCharge, iCent),
+        bpNbins, bpRange[0], bpRange[1], kTBins, kTRange[0], kTRange[1]);
+      bpCorrFctn[iCharge][iCent]->connectToManager(thModelManager);
 
-  // Initialize StHbtMaker
+      // Анализ
+      hbtAnalysis[iCharge][iCent]->setEventCut(hbtEventCut[iCharge][iCent]);
+      hbtAnalysis[iCharge][iCent]->setFirstParticleCut(hbtTrackCut[iCharge][iCent]);
+      hbtAnalysis[iCharge][iCent]->setSecondParticleCut(hbtTrackCut[iCharge][iCent]);
+      hbtAnalysis[iCharge][iCent]->setPairCut(hbtPairCut[iCharge][iCent]);
+      hbtAnalysis[iCharge][iCent]->addCorrFctn(qInvCorrFctn[iCharge][iCent]);
+      hbtAnalysis[iCharge][iCent]->addCorrFctn(bpCorrFctn[iCharge][iCent]);
+      hbtManager->addAnalysis(hbtAnalysis[iCharge][iCent]);
+    }
+  }
+
+  // ---- Цикл по событиям
   int iret = 0;
-
-  // Loop over events
-  for (int iEvent=0; iEvent<events2read; iEvent++) {
-
-    if (iEvent % 1000 == 0) std::cout << "hbt_simu -- Working on event # " << iEvent <<"/"<<events2read<< std::endl;
-    //cout<<iEvent<<endl;
+  for (int iEvent = 0; iEvent < events2read; ++iEvent) {
+    if (iEvent % 1000 == 0) std::cout << "hbt_simu -- Working on event # " << iEvent << "/" << events2read << std::endl;
     iret = hbtMaker->make();
-    if ( iret!=0 ) {
-      std::cout << "[WARNING] hbt_dau_exp returned status: " << iret
-                << ". Processing will be finished" << std::endl;
+    if (iret != 0) {
+      std::cout << "[WARNING] hbt_dau_exp returned status: " << iret << ". Processing will be finished" << std::endl;
       break;
     }
     hbtMaker->clear();
-  } // for (int iEvent=0; iEvent<events2read; iEvent++)
+  }
 
-  // Write histograms to the output file
-  TFile *oFile = new TFile(oFileName,"recreate");
-  
-  // Write histograms to the output file
-  for ( int iCharge = 0; iCharge < ChargeBins; iCharge++ ) {
-    for ( int iDetSelBins = 0; iDetSelBins < DetSelBins; iDetSelBins++ ) {
-      for ( int iCent = 0; iCent < MultBins; iCent++ ) {
-        if (useMonitors) {
-        eventPass[iCharge][iDetSelBins][iCent]->writeOutHistos();
-        eventFail[iCharge][iDetSelBins][iCent]->writeOutHistos();
-	      trackPass[iCharge][iDetSelBins][iCent]->writeOutHistos();
-        trackFail[iCharge][iDetSelBins][iCent]->writeOutHistos();
-	      pairPass[iCharge][iDetSelBins][iCent]->writeOutHistos();
-        pairFail[iCharge][iDetSelBins][iCent]->writeOutHistos();
-        } // if (useMonitors)
-        qInvCorrFctn[iCharge][iDetSelBins][iCent]->writeOutHistos();
-        bpCorrFctn[iCharge][iDetSelBins][iCent]->writeOutHistos();
-      } //iCent
-    } // for ( int iDetSelBins=0; iDetSelBins<MultBins; iDetSelBins++ )
-  } // for ( int iCharge=0; iCharge<ChargeBins; iCharge++ )
+  // ---- Запись гистограмм
+  TFile *oFile = new TFile(oFileName, "recreate");
+  for (int iCharge = 0; iCharge < ChargeBins; ++iCharge) {
+    for (int iCent = 0; iCent < MultBins; ++iCent) {
+      qInvCorrFctn[iCharge][iCent]->writeOutHistos();
+      bpCorrFctn[iCharge][iCent]->writeOutHistos();
+    }
+  }
   oFile->Close();
   hbtMaker->finish();
-  // Maker finish flag
 }

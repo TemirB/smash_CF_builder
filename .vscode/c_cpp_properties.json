@@ -3,11 +3,10 @@
         {
             "name": "Linux",
             "includePath": [
-                "${workspaceFolder}/converter/include",
-                "${workspaceFolder}/converter/src",
-                "${workspaceFolder}/CF/include",
-                "${workspaceFolder}/CF/src",
-                "${workspaceFolder}/common",
+                "${workspaceFolder}/Converter/include",
+                "${workspaceFolder}/Converter/src",
+                "${workspaceFolder}/cf_maker_new/include",
+                "${workspaceFolder}/cf_maker_new/src",
                 "/usr/include",
                 "/usr/local/include",
                 "/home/tahea/root_install/include",
