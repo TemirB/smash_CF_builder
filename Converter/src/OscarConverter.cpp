@@ -43,7 +43,7 @@ bool OscarConverter::Convert(const std::string& inputFilename, const std::string
 
     bool isElastic = false;
     int ev_num = -1;
-    int n_part = -1;
+    double n_part = -1;
     Mode mode = Mode::Init;
     int startParticlesNum = 394;
 
@@ -61,17 +61,12 @@ bool OscarConverter::Convert(const std::string& inputFilename, const std::string
 
         if (line[0] == '#') {
             std::string interaction, dummy, keyWord;
-            iss >> dummy >> interaction >> ev_num >> dummy >> dummy >> keyWord >> n_part;
-            //       #        event          1      ensemble    0        in         394
-            //       #        event          2      ensemble    0        out        399
-            //       #      interaction      in        2       out       2          rho    0.0000000    weight     42.07034                         partial    3.7040866 type     3
-            //       #        event          0      ensemble    0        end         0       impact      9.179       scattering_projectile_target        yes
-            if (interaction == "interaction") {
+            iss >> dummy >> dummy >> ev_num >> keyWord >> n_part;
+            //       #      event       0       in          394
+            if (dummy == "interaction") {
                 mode = Mode::Interaction;
-                // тут можно посмотреть считать 
-                // тип взаимодействия и его параметры
                 continue;
-            } else if (interaction == "event") {
+            } else if (dummy == "event") {
                 if (keyWord == "in") {
                     mode = Mode::InEvent;
                     isElastic = false;
@@ -82,13 +77,12 @@ bool OscarConverter::Convert(const std::string& inputFilename, const std::string
                     for (unsigned int i = 0; i < McArrays::NAllMcArrays; i++) arrays[i]->Clear();
                     continue;
                 } else if (keyWord == "out") {
-                    mode = (n_part == startParticlesNum) ? Mode::SkipEvent : Mode::OutEvent;
+                    mode = (int(n_part) == startParticlesNum) ? Mode::SkipEvent : Mode::OutEvent;
                     isElastic = (mode == Mode::SkipEvent);
                     continue;
                 } else if (keyWord == "end") {
                     mode = Mode::EndEvent;
-                    iss >> dummy >> timpactParameter;
-                    //    impact      9.179             scattering_projectile_target        yes
+                    timpactParameter = n_part;
                     if (isElastic) {
                         timpactParameter = -1.;
                         continue;
@@ -147,7 +141,7 @@ bool OscarConverter::Convert(const std::string& inputFilename, const std::string
             event->setComment("");
             event->setStepNr(1);
             event->setStepT(200.);
-            
+
             tree->Fill();
             buffer.clear();
             endBuffer.clear();
